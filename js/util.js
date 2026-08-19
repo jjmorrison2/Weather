@@ -1,16 +1,16 @@
 // Small shared helpers: dates (in the station's timezone), unit conversion,
-// formatting, localStorage caching, and DOM shortcuts.
+// formatting, color scales, localStorage caching, and DOM shortcuts.
 
 const Util = {
   // ---- dates -------------------------------------------------------------
 
   // Today's calendar date (YYYY-MM-DD) in the station's timezone, regardless
   // of the viewer's timezone.
-  todayISO() {
+  todayISO(now = new Date()) {
     return new Intl.DateTimeFormat('en-CA', {
       timeZone: CONFIG.timezone,
       year: 'numeric', month: '2-digit', day: '2-digit',
-    }).format(new Date());
+    }).format(now);
   },
 
   // Add days to a YYYY-MM-DD string (pure calendar math, timezone-safe).
@@ -18,6 +18,16 @@ const Util = {
     const [y, m, d] = iso.split('-').map(Number);
     const t = new Date(Date.UTC(y, m - 1, d + days));
     return t.toISOString().slice(0, 10);
+  },
+
+  daysInMonth(year, month1to12) {
+    return new Date(Date.UTC(year, month1to12, 0)).getUTCDate();
+  },
+
+  // Day-of-week for an ISO date, 0 = Sunday (timezone-safe).
+  dowISO(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
   },
 
   // "2026-08-16" -> "Aug 16"
@@ -34,6 +44,10 @@ const Util = {
     return t.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
   },
 
+  monthName(m1to12, style = 'short') {
+    return new Date(Date.UTC(2026, m1to12 - 1, 1)).toLocaleDateString('en-US', { month: style, timeZone: 'UTC' });
+  },
+
   // Format an ISO timestamp in the station's timezone, e.g. "Aug 17, 10:27 PM"
   localTime(ts, opts = {}) {
     return new Date(ts).toLocaleString('en-US', {
@@ -43,17 +57,25 @@ const Util = {
     });
   },
 
+  clockTime(ts) {
+    return new Date(ts).toLocaleString('en-US', {
+      timeZone: CONFIG.timezone, hour: 'numeric', minute: '2-digit',
+    });
+  },
+
   hourLabel(ts) {
     return new Date(ts).toLocaleString('en-US', {
       timeZone: CONFIG.timezone, hour: 'numeric',
     });
   },
 
-  // Hour of day (0-23) at the station, regardless of the viewer's timezone.
+  // Hour of day (0-23, fractional) at the station, regardless of viewer tz.
   hourAtStation(ts) {
-    return Number(new Intl.DateTimeFormat('en-US', {
-      timeZone: CONFIG.timezone, hour: 'numeric', hourCycle: 'h23',
-    }).format(new Date(ts)));
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: CONFIG.timezone, hour: 'numeric', minute: 'numeric', hourCycle: 'h23',
+    }).formatToParts(new Date(ts));
+    const get = (t) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+    return get('hour') + get('minute') / 60;
   },
 
   // ---- units -------------------------------------------------------------
@@ -89,6 +111,99 @@ const Util = {
     return dirs[Math.round(((deg % 360) + 360) % 360 / 22.5) % 16];
   },
 
+  // ---- math & color --------------------------------------------------------
+
+  clamp: (v, a, b) => Math.min(b, Math.max(a, v)),
+  lerp: (a, b, t) => a + (b - a) * t,
+
+  hexToRgb(hex) {
+    const h = hex.replace('#', '');
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  },
+
+  rgbToHex([r, g, b]) {
+    return '#' + [r, g, b].map((v) => Math.round(Util.clamp(v, 0, 255)).toString(16).padStart(2, '0')).join('');
+  },
+
+  mixHex(a, b, t) {
+    const A = Util.hexToRgb(a), B = Util.hexToRgb(b);
+    return Util.rgbToHex([Util.lerp(A[0], B[0], t), Util.lerp(A[1], B[1], t), Util.lerp(A[2], B[2], t)]);
+  },
+
+  // Interpolate along a list of [stopValue, hex] anchors.
+  rampColor(anchors, v) {
+    if (v <= anchors[0][0]) return anchors[0][1];
+    for (let i = 1; i < anchors.length; i++) {
+      if (v <= anchors[i][0]) {
+        const [v0, c0] = anchors[i - 1];
+        const [v1, c1] = anchors[i];
+        return Util.mixHex(c0, c1, (v - v0) / (v1 - v0));
+      }
+    }
+    return anchors[anchors.length - 1][1];
+  },
+
+  // Semantic-heat temperature scale (°F → color). A conventional weather
+  // temperature ramp — multi-hue is deliberate here (semantic heat) and every
+  // chart using it renders a labeled scale legend alongside.
+  TEMP_ANCHORS: [
+    [-10, '#b18cff'], [10, '#7aa7ff'], [32, '#5bc8e8'], [50, '#4fd0a0'],
+    [65, '#a3d65c'], [75, '#f2c94c'], [85, '#f2994a'], [95, '#eb5757'], [105, '#d64545'],
+  ],
+  tempColor(f) {
+    return f == null ? '#7b8a99' : Util.rampColor(Util.TEMP_ANCHORS, f);
+  },
+
+  // Sequential blue for precipitation magnitude on the dark surface:
+  // near-zero recedes toward the panel, heavier rain steps lighter/brighter.
+  PRECIP_ANCHORS: [
+    [0, '#1b2a3e'], [0.1, '#1c4a74'], [0.35, '#2a6db3'], [0.75, '#3987e5'],
+    [1.5, '#6fb1f5'], [3, '#a8d2fb'],
+  ],
+  precipColor(inches) {
+    return Util.rampColor(Util.PRECIP_ANCHORS, inches ?? 0);
+  },
+
+  // ---- weather codes (Open-Meteo / WMO) -------------------------------------
+
+  wmo(code) {
+    const c = Number(code);
+    const table = [
+      [[0], 'Clear', 'clear'],
+      [[1], 'Mostly clear', 'clear'],
+      [[2], 'Partly cloudy', 'clouds'],
+      [[3], 'Overcast', 'clouds'],
+      [[45, 48], 'Fog', 'fog'],
+      [[51, 53, 55, 56, 57], 'Drizzle', 'rain'],
+      [[61, 63, 66, 80, 81], 'Rain', 'rain'],
+      [[65, 67, 82], 'Heavy rain', 'rain'],
+      [[71, 73, 75, 77, 85, 86], 'Snow', 'snow'],
+      [[95, 96, 99], 'Thunderstorm', 'storm'],
+    ];
+    for (const [codes, label, kind] of table) {
+      if (codes.includes(c)) return { label, kind };
+    }
+    return { label: '', kind: 'clear' };
+  },
+
+  // ---- climate normals -------------------------------------------------------
+
+  // Normal precipitation accumulated from Jan 1 through the given ISO date
+  // (linear within the month).
+  normalToDate(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    let total = 0;
+    for (let i = 1; i < m; i++) total += CONFIG.normals.precip[i - 1];
+    total += CONFIG.normals.precip[m - 1] * (d / Util.daysInMonth(y, m));
+    return total;
+  },
+
+  // Normal precipitation for the month of `iso`, prorated to its day.
+  normalMonthToDate(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    return CONFIG.normals.precip[m - 1] * (d / Util.daysInMonth(y, m));
+  },
+
   // ---- formatting ----------------------------------------------------------
 
   fmt(v, digits = 0, suffix = '') {
@@ -96,9 +211,9 @@ const Util = {
     return v.toFixed(digits) + suffix;
   },
 
-  fmtIn(v) { // precipitation in inches
+  fmtIn(v, digits = 2) { // precipitation in inches
     if (v == null || Number.isNaN(v)) return '—';
-    return v.toFixed(2) + '"';
+    return v.toFixed(digits) + '″';
   },
 
   esc(s) {
@@ -129,7 +244,7 @@ const Util = {
     const gone = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && k.startsWith('wx:')) gone.push(k);
+      if (k && k.startsWith('wx:') && k !== 'wx:apikey' && k !== 'wx:station') gone.push(k);
     }
     gone.forEach((k) => localStorage.removeItem(k));
   },

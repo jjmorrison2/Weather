@@ -3,122 +3,262 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Columbia, MO Weather</title>
+  <title>Columbia Sky — KMOCOLUM262</title>
+  <meta name="description" content="A living weather observatory for PWS KMOCOLUM262, Columbia MO">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌦️</text></svg>">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-  <header class="topbar">
-    <div>
-      <h1 id="page-title">Weather</h1>
-      <div class="subtitle">
+  <!-- ======================= LIVING SKY HERO ======================= -->
+  <div class="hero">
+    <div id="scene" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-name">COLUMBIA&nbsp;SKY</span>
         <span class="badge" id="station-badge">—</span>
-        <span id="updated" class="muted">Loading…</span>
+        <span class="live-dot" title="auto-refreshing"></span>
+      </div>
+      <div class="topbar-right">
+        <span id="clock" class="clock">—</span>
+        <button id="refresh-btn" class="btn-ghost" title="Refresh now">⟳</button>
+        <button id="settings-btn" class="btn-ghost" title="Settings">⚙</button>
+      </div>
+    </header>
+
+    <div class="hero-content">
+      <div class="hero-main">
+        <div class="hero-temp" id="hero-temp">—°</div>
+        <div class="hero-cond">
+          <div id="hero-text" class="hero-text">Reading the sky…</div>
+          <div id="hero-sub" class="hero-sub"></div>
+        </div>
+      </div>
+      <div class="hero-chips" id="hero-chips"></div>
+      <div class="hero-foot">
+        <span id="updated" class="hero-updated">Loading…</span>
+        <span id="current-note" class="hero-note" hidden></span>
       </div>
     </div>
-    <div class="topbar-actions">
-      <button id="refresh-btn" class="btn" title="Refresh now">⟳ Refresh</button>
-      <button id="settings-btn" class="btn" title="Settings">⚙ Settings</button>
-    </div>
-  </header>
+  </div>
 
   <main>
-
     <div id="alerts" class="alerts" hidden></div>
 
-    <section>
-      <h2>Current conditions</h2>
-      <div id="current-note" class="notice" hidden></div>
-      <div id="current" class="card panel"><div class="loading">Loading current conditions…</div></div>
-    </section>
-
-    <section>
+    <!-- ======================= THE RAIN LEDGER ======================= -->
+    <section id="rain">
       <div class="section-head">
-        <h2>Precipitation</h2>
+        <div>
+          <h2>The Rain Ledger</h2>
+          <p class="section-sub" id="rain-verdict">—</p>
+        </div>
         <span id="precip-source" class="source-badge"></span>
       </div>
       <div id="precip-note" class="notice" hidden></div>
-      <div id="precip-cards" class="precip-cards"><div class="loading">Loading precipitation totals…</div></div>
 
-      <div class="chart-block">
-        <div class="chart-head">
-          <h3>Daily rainfall</h3>
-          <div id="chart-windows" class="btn-group">
-            <button data-window="30" class="active">30 days</button>
-            <button data-window="60">60 days</button>
-            <button data-window="90">90 days</button>
-            <button data-window="ytd">Year</button>
+      <div class="rain-grid">
+        <div class="card gauges-card">
+          <div class="gauge-pair">
+            <figure class="gauge-fig">
+              <div id="gauge-month"></div>
+              <figcaption>This month<span id="gauge-month-note" class="fig-note"></span></figcaption>
+            </figure>
+            <figure class="gauge-fig">
+              <div id="gauge-year"></div>
+              <figcaption>This year<span id="gauge-year-note" class="fig-note"></span></figcaption>
+            </figure>
           </div>
         </div>
-        <div id="precip-chart" class="chart"></div>
+
+        <div class="rain-right">
+          <div id="precip-cards" class="stat-row"></div>
+          <div class="card heatmap-card">
+            <div class="card-head">
+              <h3>Every day of rain this year</h3>
+            </div>
+            <div id="heatmap" class="heatmap-scroll"></div>
+          </div>
+        </div>
       </div>
 
-      <div class="chart-block">
-        <h3>Cumulative rainfall — year to date</h3>
-        <div id="cumulative-chart" class="chart"></div>
+      <div class="chart-duo">
+        <div class="card chart-card">
+          <div class="card-head">
+            <h3>Daily rainfall</h3>
+            <div id="chart-windows" class="seg" role="tablist">
+              <button data-window="30" class="active">30d</button>
+              <button data-window="60">60d</button>
+              <button data-window="90">90d</button>
+              <button data-window="ytd">Year</button>
+            </div>
+          </div>
+          <div id="precip-chart"></div>
+        </div>
+        <div class="card chart-card">
+          <div class="card-head">
+            <h3>The race against normal</h3>
+            <div class="legend">
+              <span class="key"><i class="key-line" style="background:#3987e5"></i>2026 actual</span>
+              <span class="key"><i class="key-line key-dash"></i>NOAA normal</span>
+            </div>
+          </div>
+          <div id="cumulative-chart"></div>
+        </div>
+      </div>
+
+      <details class="table-details">
+        <summary>Monthly totals table</summary>
+        <div id="monthly-table" class="table-wrap"></div>
+      </details>
+    </section>
+
+    <!-- ======================= INSTRUMENTS ======================= -->
+    <section id="instruments">
+      <h2>Instruments</h2>
+      <div class="instrument-grid">
+        <div class="card instrument-card">
+          <h3>Sun</h3>
+          <div id="sun-dial"></div>
+          <div id="sun-extra" class="instrument-extra"></div>
+        </div>
+        <div class="card instrument-card">
+          <h3>Wind</h3>
+          <div id="wind-compass"></div>
+        </div>
+        <div class="card instrument-card">
+          <h3>Barometer</h3>
+          <div id="barometer"></div>
+        </div>
+        <div class="card instrument-card">
+          <h3>Moon</h3>
+          <div id="moon-panel"></div>
+        </div>
+        <div class="card instrument-card">
+          <h3>Comfort</h3>
+          <div id="comfort"></div>
+        </div>
       </div>
     </section>
 
-    <section>
-      <h2>Forecast <span class="muted h2-sub">NWS, for the station’s location</span></h2>
-      <div id="forecast" class="forecast-grid"><div class="loading">Loading forecast…</div></div>
-      <h3>Next 48 hours</h3>
-      <div id="hourly" class="hourly-strip"><div class="loading">Loading hourly forecast…</div></div>
+    <!-- ======================= FORECAST ======================= -->
+    <section id="forecast-section">
+      <div class="section-head">
+        <div>
+          <h2>The Next 48 Hours</h2>
+          <p class="section-sub">National Weather Service, for this exact spot — not the airport</p>
+        </div>
+        <div class="legend">
+          <span class="key" id="meteo-temp-legend"></span>
+          <span class="key"><i class="key-line" style="background:#8fa0b2"></i>dew point</span>
+          <span class="key"><i class="key-swatch" style="background:#3987e5"></i>precip chance</span>
+        </div>
+      </div>
+      <div class="card chart-card">
+        <div id="meteogram"></div>
+      </div>
+      <details class="table-details">
+        <summary>Hourly table</summary>
+        <div id="hourly-table" class="table-wrap"></div>
+      </details>
+
+      <h2 class="mt">Seven Days Out</h2>
+      <div class="card week-card">
+        <div id="week-strip"></div>
+      </div>
     </section>
 
-    <section>
-      <h2>Recent history</h2>
-
-      <h3>Last 14 days at the station</h3>
-      <div id="daily-table" class="table-wrap"><div class="loading">Loading daily history…</div></div>
-
-      <div class="chart-block">
-        <h3>High / low temperatures — last 30 days</h3>
-        <div id="temp-chart" class="chart"></div>
+    <!-- ======================= ALMANAC ======================= -->
+    <section id="almanac">
+      <div class="section-head">
+        <div>
+          <h2>Station Almanac</h2>
+          <p class="section-sub">What the weather has been up to, according to your backyard</p>
+        </div>
       </div>
+      <div id="records" class="stat-row records-row"></div>
+      <div class="almanac-grid">
+        <div class="card events-card">
+          <h3>Recent weather that mattered</h3>
+          <ol id="events" class="events"></ol>
+        </div>
+        <div class="card temp30-card">
+          <div class="card-head">
+            <h3>High / low — last 30 days</h3>
+            <span class="key" id="temp30-legend"></span>
+          </div>
+          <div id="temp-chart"></div>
+        </div>
+      </div>
+    </section>
 
-      <h3>KCOU observation log <span class="muted h2-sub">Columbia Regional Airport, ~4 mi away</span></h3>
-      <div id="obs-table" class="table-wrap"><div class="loading">Loading observations…</div></div>
+    <!-- ======================= LOGS ======================= -->
+    <section id="logs">
+      <h2>Observation Deck</h2>
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="daily">Station log · 14 days</button>
+        <button class="tab" data-tab="kcou">KCOU airport log</button>
+      </div>
+      <div id="tab-daily" class="tab-panel">
+        <div id="daily-table" class="table-wrap card"></div>
+      </div>
+      <div id="tab-kcou" class="tab-panel" hidden>
+        <p class="section-sub">Columbia Regional Airport, ~4 miles away — the official record.</p>
+        <div id="obs-table" class="table-wrap card"></div>
+      </div>
     </section>
 
   </main>
 
   <footer>
     <p>
-      Data: <a href="https://www.wunderground.com/dashboard/pws/KMOCOLUM262" target="_blank" rel="noopener">Weather Underground (KMOCOLUM262)</a> ·
-      <a href="https://forecast.weather.gov/data/obhistory/KCOU.html" target="_blank" rel="noopener">NWS KCOU history</a> ·
-      <a href="https://www.weather.gov/lsx/" target="_blank" rel="noopener">NWS St. Louis</a> ·
+      <strong>Columbia Sky</strong> · data from
+      <a href="https://www.wunderground.com/dashboard/pws/KMOCOLUM262" target="_blank" rel="noopener">Weather Underground (KMOCOLUM262)</a>,
+      <a href="https://forecast.weather.gov/data/obhistory/KCOU.html" target="_blank" rel="noopener">NWS KCOU</a>,
+      <a href="https://www.weather.gov/lsx/" target="_blank" rel="noopener">NWS St. Louis</a>,
       <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>
+      · normals: NOAA 1991–2020
     </p>
+    <p class="footer-hint">Sky not matching the window? The scene follows the station's own sensors. Try <code>?wx=storm</code> or <code>?t=22</code> for a preview.</p>
   </footer>
 
   <dialog id="settings-dialog">
     <h2>Settings</h2>
     <label for="setting-apikey">Weather Underground API key</label>
     <input id="setting-apikey" type="text" autocomplete="off" spellcheck="false" placeholder="paste your API key">
-    <p class="muted small">
+    <p class="dialog-hint">
       As the station owner you get a free key at
       <a href="https://www.wunderground.com/member/api-keys" target="_blank" rel="noopener">wunderground.com/member/api-keys</a>.
-      With a key, precipitation and history come from your station’s actual rain gauge.
-      Without one, the dashboard uses modeled estimates (Open-Meteo) instead.
-      The key is stored only in this browser (localStorage).
+      With a key, rainfall and history come from your station's actual gauge; without one the
+      dashboard uses modeled estimates (Open-Meteo). The key is stored only in this browser.
     </p>
     <label for="setting-station">Station ID</label>
     <input id="setting-station" type="text" autocomplete="off" spellcheck="false" placeholder="KMOCOLUM262">
-    <div id="settings-status" class="muted small" role="status"></div>
+    <label for="setting-scene">Sky scene</label>
+    <select id="setting-scene">
+      <option value="">Follow the real weather</option>
+      <option value="clear">Preview: clear</option>
+      <option value="clouds">Preview: cloudy</option>
+      <option value="rain">Preview: rain</option>
+      <option value="storm">Preview: thunderstorm</option>
+      <option value="snow">Preview: snow</option>
+    </select>
+    <div id="settings-status" class="dialog-hint" role="status"></div>
     <div class="dialog-actions">
-      <button id="settings-clear" class="btn">Clear cached data</button>
+      <button id="settings-clear" class="btn-ghost">Clear cached data</button>
       <span class="spacer"></span>
-      <button id="settings-cancel" class="btn">Cancel</button>
-      <button id="settings-save" class="btn btn-primary">Save</button>
+      <button id="settings-cancel" class="btn-ghost">Cancel</button>
+      <button id="settings-save" class="btn-primary">Save</button>
     </div>
   </dialog>
 
   <script src="js/config.js"></script>
   <script src="js/util.js"></script>
+  <script src="js/astro.js"></script>
   <script src="js/sources.js"></script>
+  <script src="js/scene.js"></script>
   <script src="js/charts.js"></script>
+  <script src="js/almanac.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

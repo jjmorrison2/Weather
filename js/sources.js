@@ -137,6 +137,18 @@ const OM = {
   daily: 'precipitation_sum,temperature_2m_max,temperature_2m_min,wind_speed_10m_max,wind_gusts_10m_max',
   units: `precipitation_unit=inch&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=${encodeURIComponent(CONFIG.timezone)}`,
 
+  // Live sky state for the scene renderer (cloud cover + WMO weather code) —
+  // free and keyless, so the living sky works for everyone.
+  async sceneNow() {
+    const url = 'https://api.open-meteo.com/v1/forecast' +
+      `?latitude=${CONFIG.lat}&longitude=${CONFIG.lon}` +
+      '&current=temperature_2m,relative_humidity_2m,cloud_cover,weather_code,is_day,' +
+      'precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m' +
+      `&${this.units}`;
+    const data = await Util.fetchJSON(url);
+    return data?.current ?? null;
+  },
+
   rowsFrom(data) {
     const d = data?.daily;
     if (!d?.time) return [];
